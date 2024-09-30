@@ -1,5 +1,6 @@
 package core;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -117,6 +118,37 @@ public class Expression implements Cloneable{
         System.arraycopy(coefficients, 0, newArr, 0, highestDegree+1);
         return newArr;
     }
+
+//    public double[] coefficientsOfPolynomialExpression(){
+//        if (expression.isEmpty()){
+//            return new double[0];
+//        }
+//        ArrayList<Double> coefficients = new ArrayList<>(5);
+//        int highestDegree = 0;
+//        int i = 0;
+//        while (i<expression.length()){
+//            if(Character.isAlphabetic(expression.charAt(i))){
+//                int[] degreeAndEndIndex = getDegreeAtIndex(i);
+//                coefficients.set(degreeAndEndIndex[0], coefficients.get(degreeAndEndIndex[0]) + getCoefficientAtIndex(i));
+//                i = degreeAndEndIndex[1]+1;
+//                continue;
+//            }
+//            else if(Character.isDigit(expression.charAt(i))){
+//                double[] zeroCoefficientAndEndIndex = zeroDegreeCoefficient(i);
+//                coefficients.set(0, coefficients.get(0) + zeroCoefficientAndEndIndex[0]);
+//                i = (int)zeroCoefficientAndEndIndex[1];
+//                continue;
+//            }
+//            i++;
+//        }
+//        double[] newArr = new double[coefficients.size()];
+//        for (int j = 0; j < newArr.length; j++) {
+//            newArr[j] = coefficients.get(j);
+//        }
+//        //System.arraycopy(coefficients, 0, newArr, 0, highestDegree+1);
+//        return newArr;
+//    }
+
     public static Expression coefficientsToLinearExpression(HashMap<Character, Double> coefficients){
         StringBuilder stringBuilder = new StringBuilder();
         Set<Character> set = coefficients.keySet();

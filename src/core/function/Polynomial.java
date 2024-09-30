@@ -14,7 +14,7 @@ public class Polynomial extends Function implements Cloneable{
     public static final int HIGHEST_POSSIBLE_DEGREE = 100000;
     private double[] coefficients;
     private Polynomial derivative;
-    private int numberOfRoots;
+    private int numberOfRoots = 0;
     private ArrayList<Polynomial> sturmSequence;
     private double[] solutions;
 
@@ -55,7 +55,7 @@ public class Polynomial extends Function implements Cloneable{
         }
         return derivative.clone();
     }
-    private ArrayList<Polynomial> getSturmSequence(){
+    public ArrayList<Polynomial> getSturmSequence(){
         if (sturmSequence == null){
             sturmSequence = sturmSequenceGenerator();
         }
@@ -117,8 +117,7 @@ public class Polynomial extends Function implements Cloneable{
         return generateFromCoefficients(coefficients);
     }
     private double newtonMethod(double x0) {
-        System.out.println("x0 = " + x0);
-        double x1 = x0 - valueAt(x0) / (getDerivative().valueAt(x0) == 0 ? getDerivative().valueAt(x0-1) : getDerivative().valueAt(x0));
+        double x1 = x0 - valueAt(x0) / (getDerivative().valueAt(x0) == 0 ? getDerivative().valueAt(x0-0.0001) : getDerivative().valueAt(x0));
         int iteration = 0;
         while (Math.abs(x1 - x0) > PRECISION && iteration < MAX_ITERATIONS) {
             x0 = x1;
@@ -127,13 +126,27 @@ public class Polynomial extends Function implements Cloneable{
         }
         return x1;
     }
-    private static double[] subtractArray(double[] minuend, double[] subtrahend){
+    private double bisectionMethod(double x1, double x2) {
+        double x = x1;
+        int iteration = 0;
+        while (Math.abs(x2 - x1) > PRECISION && iteration++ < MAX_ITERATIONS) {
+            x = (x1 + x2) / 2;
+            double fx1 = valueAt(x1);
+            double fx = valueAt(x);
+            if (fx == 0) return x;
+            x1 = (fx1 < 0 && fx < 0) || (fx1 >= 0 && fx > 0)? x: x1;
+            x2 = (fx1 < 0 && fx > 0) || (fx1 >= 0 && fx < 0)? x: x2;
+        }
+        return x;
+    }
+    private static double[] subtractArray(double[] minuend, double[] subtrahend) {
+        double epsilon = 1e-15;
         for (int i = 0; i < subtrahend.length; i++) {
             minuend[i] -= subtrahend[i];
         }
         int newLength = 0;
         for (int i = 0; i < minuend.length; i++) {
-            if (minuend[i] != 0) {
+            if (Math.abs(minuend[i]) > epsilon) {
                 newLength = i + 1;
             }
         }
@@ -155,21 +168,7 @@ public class Polynomial extends Function implements Cloneable{
         }
         return generateFromCoefficients(remainder);
     }
-    private static double[] getRidOfFirstZeroes(double[] array){
-        int firstNonZeroIndex = 0;
-        for (int i = 0; i < array.length; i++) {
-            if (array[i] != 0) {
-                firstNonZeroIndex = i;
-                break;
-            }
-        }
-        if (firstNonZeroIndex != 0){
-            firstNonZeroIndex--;
-        }
-        double[] newArray = new double[array.length - firstNonZeroIndex];
-        System.arraycopy(array, firstNonZeroIndex, newArray, 0, newArray.length);
-        return newArray;
-    }
+
     private ArrayList<Polynomial> sturmSequenceGenerator(){
         ArrayList<Polynomial> sturmSequence = new ArrayList<>();
         Polynomial firstTerm = this;
@@ -260,18 +259,27 @@ public class Polynomial extends Function implements Cloneable{
         binarySearch(upperBound, second, arrayList);
     }
 
+    private double getBound(){
+        int n = getNumberOfRoots();
+        int bound = 10;
+        while (numberOfRootsOn(-bound, bound) != n){
+            bound *= 2;
+        }
+        return bound;
+    }
+
     public double[] solve(){
         int n = getNumberOfRoots();
         int i = 0;
         double[] solutions = new double[n];
         double mid;
-        double bound = 100;
+        double bound = getBound();
         ArrayList<Double> intervals = new ArrayList<>(n+1);
-        binarySearch(-bound, bound, intervals);
-        System.out.println(intervals);
+        binarySearch(-bound, bound-1, intervals);
         for(; i < n; i++) {
-            mid = (intervals.get(i) + intervals.get(i+1)) / 2;
-            solutions[i] = (newtonMethod(mid));
+            double x1 = intervals.get(i);
+            double x2 = intervals.get(i+1);
+            solutions[i] = valueAt(x1) * valueAt(x2) < 0 ? bisectionMethod(x1, x2) : newtonMethod((x1 + x2)/2);
         }
         return solutions;
     }
