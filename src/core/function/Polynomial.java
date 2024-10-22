@@ -3,9 +3,6 @@ package core.function;
 import core.Expression;
 import core.Point;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,31 +11,14 @@ public class Polynomial extends Function implements Cloneable{
     public static final int HIGHEST_POSSIBLE_DEGREE = 100000;
     private double[] coefficients;
     private Polynomial derivative;
-    private int numberOfRoots = 0;
-    private ArrayList<Polynomial> sturmSequence;
+    private final ArrayList<Double> rootIntervals = new ArrayList<>();
+    private int numberOfRoots = -1;
     private double[] solutions;
 
     public Polynomial(Expression expression){
         super(expression);
         coefficients = expression.coefficientsOfPolynomialExpression();
     }
-    public Polynomial clone(){
-        try {
-            Polynomial clone = (Polynomial) super.clone();
-            clone.coefficients = getCoefficients().clone();
-            if (derivative != null){
-                clone.derivative = derivative.clone();
-            }
-            if (sturmSequence != null){
-                clone.sturmSequence = (ArrayList<Polynomial>) sturmSequence.clone();
-            }
-            return clone;
-        }
-        catch (CloneNotSupportedException e) {
-            return null;
-        }
-    }
-
     public static Polynomial generateFromCoefficients(double[] coefficients){
         Polynomial polynomial = new Polynomial(Expression.coefficientsToPolynomialExpression(coefficients));
         polynomial.coefficients = coefficients.clone();
@@ -55,24 +35,41 @@ public class Polynomial extends Function implements Cloneable{
         }
         return derivative.clone();
     }
-    public ArrayList<Polynomial> getSturmSequence(){
-        if (sturmSequence == null){
-            sturmSequence = sturmSequenceGenerator();
-        }
-        return (ArrayList<Polynomial>)sturmSequence.clone();
-    }
-
     public double[] getSolutions() {
         if (solutions == null){
             solutions = this.solve();
         }
         return solutions;
     }
+    private ArrayList<Double> getRootIntervals(){
+        if (numberOfRoots == -1){
+            ArrayList<Polynomial> sturmSequence = sturmSequenceGenerator();
+            double bound = getBound(sturmSequence);
+            rootIsolator(-bound, bound+1, sturmSequence);
+        }
+        return rootIntervals;
+    }
     public int getNumberOfRoots(){
-        if (numberOfRoots == 0){
-            numberOfRoots = numberOfRootsOn();
+        if (numberOfRoots == -1){
+            numberOfRoots = numberOfRoots();
         }
         return numberOfRoots;
+    }
+    public int getHighestDegree(){
+        return coefficients.length - 1;
+    }
+    public Polynomial clone(){
+        try {
+            Polynomial clone = (Polynomial) super.clone();
+            clone.coefficients = getCoefficients().clone();
+            if (derivative != null){
+                clone.derivative = derivative.clone();
+            }
+            return clone;
+        }
+        catch (CloneNotSupportedException e) {
+            return null;
+        }
     }
     public double valueAt(double x){
         double result = coefficients[0];
@@ -92,9 +89,6 @@ public class Polynomial extends Function implements Cloneable{
             coefficientsOfDerivative[i-1] = coefficients[i] * i;
         }
         return generateFromCoefficients(coefficientsOfDerivative);
-    }
-    public int getHighestDegree(){
-        return coefficients.length - 1;
     }
     public static Polynomial multiplication(Polynomial firstPolynomial, Polynomial secondPolynomial){
         return generateFromCoefficients(multiplication(firstPolynomial.getCoefficients(),secondPolynomial.getCoefficients()));
@@ -134,8 +128,8 @@ public class Polynomial extends Function implements Cloneable{
             double fx1 = valueAt(x1);
             double fx = valueAt(x);
             if (fx == 0) return x;
-            x1 = (fx1 < 0 && fx < 0) || (fx1 >= 0 && fx > 0)? x: x1;
-            x2 = (fx1 < 0 && fx > 0) || (fx1 >= 0 && fx < 0)? x: x2;
+            x1 = fx1 * fx >= 0 ? x: x1;
+            x2 = fx1 * fx < 0 ? x: x2;
         }
         return x;
     }
@@ -182,8 +176,7 @@ public class Polynomial extends Function implements Cloneable{
         }
         return sturmSequence;
     }
-    public int numberOfRootsOn(double start, double end){
-        ArrayList<Polynomial> sturmSequence = getSturmSequence();
+    private int numberOfRootsOn(double start, double end, ArrayList<Polynomial> sturmSequence){
         boolean sign1 = sturmSequence.getFirst().valueAt(start) > 0;
         boolean sign2 = sturmSequence.getFirst().valueAt(end) > 0;
         int counter1 = 0;
@@ -200,9 +193,14 @@ public class Polynomial extends Function implements Cloneable{
         }
         return counter1-counter2;
     }
-    private int numberOfRootsOn(){
-        ArrayList<Polynomial> sturmSequence = getSturmSequence();
-        double[] current = sturmSequence.get(0).getCoefficients();
+    public int numberOfRoots(){
+        return getRootIntervals().size()-1;
+    }
+    private int numberOfRoots(ArrayList<Polynomial> sturmSequence){
+        if(numberOfRoots != -1){
+            return numberOfRoots;
+        }
+        double[] current = sturmSequence.getFirst().getCoefficients();
         boolean sign1;
         boolean sign2;
         if (current.length % 2 == 1){
@@ -234,49 +232,36 @@ public class Polynomial extends Function implements Cloneable{
                 sign2 = !sign2;
             }
         }
-        return counter1-counter2;
+        numberOfRoots = counter1-counter2;
+        return numberOfRoots;
     }
-    private void binarySearch(double first, double second, ArrayList<Double> arrayList){
-        if (arrayList.size() == (getNumberOfRoots())){
-            arrayList.add(first);
+    private void rootIsolator(double first, double second, ArrayList<Polynomial> sturmSequence){
+        if (rootIntervals.size() == numberOfRoots(sturmSequence)){
+            rootIntervals.add(first);
             return;
         }
         double lowerBound = first;
         double upperBound = second;
-        double mid;
-        while (numberOfRootsOn(lowerBound, upperBound) > 1 || (upperBound - lowerBound) > 20){
-            mid = (lowerBound + upperBound) / 2;
-            if (valueAt(mid) == 0){
-                lowerBound = mid-1;
-            }
-            if (numberOfRootsOn(lowerBound, mid) != 0){
-                upperBound = mid;
-                continue;
-            }
-            lowerBound = mid;
+        while (numberOfRootsOn(lowerBound, upperBound, sturmSequence) > 1 || (upperBound - lowerBound) > 10){
+            double mid = (lowerBound + upperBound) / 2;
+            if (numberOfRootsOn(lowerBound, mid, sturmSequence) != 0) upperBound = mid;
+            else lowerBound = mid;
         }
-        arrayList.add(lowerBound);
-        binarySearch(upperBound, second, arrayList);
+        rootIntervals.add(lowerBound);
+        rootIsolator(upperBound, second, sturmSequence);
     }
-
-    private double getBound(){
-        int n = getNumberOfRoots();
+    private double getBound(ArrayList<Polynomial> sturmSequence){
+        int n = numberOfRoots(sturmSequence);
         int bound = 10;
-        while (numberOfRootsOn(-bound, bound) != n){
-            bound *= 2;
-        }
+        while (numberOfRootsOn(-bound, bound, sturmSequence) != n) bound *= 2;
         return bound;
     }
 
-    public double[] solve(){
+    private double[] solve(){
         int n = getNumberOfRoots();
-        int i = 0;
         double[] solutions = new double[n];
-        double mid;
-        double bound = getBound();
-        ArrayList<Double> intervals = new ArrayList<>(n+1);
-        binarySearch(-bound, bound-1, intervals);
-        for(; i < n; i++) {
+        ArrayList<Double> intervals = getRootIntervals();
+        for(int i = 0; i < n; i++) {
             double x1 = intervals.get(i);
             double x2 = intervals.get(i+1);
             solutions[i] = valueAt(x1) * valueAt(x2) < 0 ? bisectionMethod(x1, x2) : newtonMethod((x1 + x2)/2);
@@ -284,31 +269,24 @@ public class Polynomial extends Function implements Cloneable{
         return solutions;
     }
     public boolean isSolvable(){
-        return numberOfRootsOn() != 0;
+        return getNumberOfRoots() != 0;
     }
-    public Polynomial interpolate(List<Point> points) {
+    public static Polynomial interpolate(List<Point> points) {
         int n = points.size();
         double[] x = new double[n];
         double[] y = new double[n];
-
         for (int i = 0; i < n; i++) {
             x[i] = points.get(i).getX();
             y[i] = points.get(i).getY();
         }
-
         double[][] dividedDifferences = new double[n][n];
-        for (int i = 0; i < n; i++) {
-            dividedDifferences[0][i] = y[i];
-        }
+        System.arraycopy(y, 0, dividedDifferences[0], 0, n);
         for (int i = 1; i < n; i++) {
             for (int j = 0; j < n-i ; j++) {
                 dividedDifferences[i][j] = (dividedDifferences[i-1][j+1] - dividedDifferences[i-1][j]) / (x[i+j] - x[j]);
             }
         }
-
-
         double[][] coeffsArray = new double[n][n];
-
         coeffsArray[0][0]=1;
         for (int i=1;i<n;i++){
             double[] newTerm = new double[2];
@@ -322,20 +300,16 @@ public class Polynomial extends Function implements Cloneable{
             }
         }
         double[] columnSums = new double[n];
-
         for (int j = 0; j < n; j++) {
             double sum = 0.0;
-
             for (int i = 0; i < n; i++) {
                 sum += coeffsArray[i][j];
             }
-
             columnSums[j] = sum;
         }
-
         return generateFromCoefficients(columnSums);
     }
-    public double interpolateValue(double xValue, List<Point> points) {
+    public static double interpolateValue(double xValue, List<Point> points) {
         Polynomial interpolatingPolynomial = interpolate(points);
         return interpolatingPolynomial.valueAt(xValue);
     }

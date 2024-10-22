@@ -19,7 +19,7 @@ public abstract class Function {
         return expression.toString();
     }
     public abstract boolean isSolvable();
-    protected abstract double[] solve();
+    protected abstract double[] getSolutions();
     protected abstract Function derivative();
     public abstract double valueAt(double x);
 }
